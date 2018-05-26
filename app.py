@@ -1,11 +1,17 @@
 import csv
-
+import MySQLdb
 from flask import Flask,request
 import json
 app = Flask(__name__)
 
+db = MySQLdb.connect(host="db4free.net",  # your host 
+                     user="fyletask",       # username
+                     passwd="",     # password
+                     db="fyletask")   # name of the database
+
 @app.route('/',methods=['GET', 'POST'])
 def index():
+	cur = db.cursor()
 	data=request.get_json()
 	print(data.keys())
 	datatosend=[]
@@ -15,11 +21,13 @@ def index():
 		if data["type"]=="1":
 			if "ifsc" in data.keys():
 				ifsc = data["ifsc"]
-				for row in reader:
-					if row[0]==ifsc:
-						dataitem={"ifsc":row[0],"bank_id":row[1],"branch":row[2],"address":row[3],"city":row[4],"district":row[5],"state":row[6],"bank_name":row[7]}
-				if not dataitem:
+				query = "SELECT a.`ifsc`,b.`name` AS 'bankname',a.`branch`,a.`address`,a.`city`,a.`district`,a.`state` FROM `branches` AS a,`banks` AS b WHERE a.`ifsc`='"+ifsc+"' AND a.`bank_id`=b.`id`"
+				cur.execute(query)
+				results = cur.fetchall()
+				if len(results)==0:
 					dataitem["failure"]="No Data found of the given IFSC number"
+				else:
+					dataitem=results[0]
 			else:
 				dataitem["failure"]="Incorrect Parameters Supplied"
 			datatosend.append(dataitem)
@@ -30,13 +38,14 @@ def index():
 				city = city.upper()
 				bank_name = data["bankname"]
 				bank_name = bank_name.upper()
-				for row in reader:
-					if row[4]==city and row[7]==bank_name:
-						dataitem={"ifsc":row[0],"bank_id":row[1],"branch":row[2],"address":row[3],"city":row[4],"district":row[5],"state":row[6],"bank_name":row[7]}
-						datatosend.append(dataitem)
-				if len(datatosend)==0:
+				query = "SELECT a.`ifsc`,b.`name` AS 'bankname',a.`branch`,a.`address`,a.`city`,a.`district`,a.`state` FROM `branches` AS a,`banks` AS b WHERE b.`name`='"+bank_name+"' and b.`id`=a.`bank_id` and a.`city`='"+city+"'"
+				cur.execute(query)
+				if len(results)==0:
 					dataitem["failure"]="No Data found of the Bank Name and City Combination"
 					datatosend.append(dataitem)
+				else:
+					for i in results:
+						datatosend.append(i)
 			else:
 				dataitem["failure"]="Incorrect Parameters Supplied"
 				datatosend.append(dataitem)
